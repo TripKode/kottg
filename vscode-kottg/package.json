@@ -1,0 +1,60 @@
+{
+    "name": "kottg-language",
+    "displayName": "Kottg Language Support",
+    "description": "Language support for KodeChain Kottg smart contracts",
+    "version": "1.0.0",
+    "publisher": "kodechain",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "keywords": [
+        "kottg",
+        "kodechain",
+        "blockchain",
+        "smart contracts"
+    ],
+    "icon": "icon.png",
+    "contributes": {
+        "languages": [
+            {
+                "id": "kottg",
+                "aliases": [
+                    "Kottg",
+                    "kottg"
+                ],
+                "extensions": [
+                    ".kg"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "kottg",
+                "scopeName": "source.kottg",
+                "path": "./syntaxes/kottg.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "kottg",
+                "path": "./snippets/kottg.json"
+            }
+        ],
+        "themes": [
+            {
+                "label": "Kottg Dark",
+                "uiTheme": "vs-dark",
+                "path": "./themes/kottg-dark.json"
+            }
+        ]
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/kodechain/kottg"
+    },
+    "license": "MIT"
+}

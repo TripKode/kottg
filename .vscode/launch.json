@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Kottg Compiler",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/main.go",
+            "args": [
+                "-input",
+                "contracts/StakingQuery.kg",
+                "-verbose"
+            ],
+            "env": {},
+            "showLog": true
+        },
+        {
+            "name": "Debug Current Contract",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/main.go",
+            "args": [
+                "-input",
+                "${file}",
+                "-verbose",
+                "-ast",
+                "-disasm"
+            ],
+            "env": {},
+            "showLog": true
+        }
+    ]
+}

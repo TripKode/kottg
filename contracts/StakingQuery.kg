@@ -1,0 +1,56 @@
+contract StakingQuery {
+    state:
+        owner: address
+        totalQueries: u256
+        minStake: u256
+
+    event StakeQueried {
+        validator: address indexed,
+        stake: u256,
+        timestamp: u256
+    }
+
+    init(ownerAddr: address, minimumStake: u256) {
+        self.owner = ownerAddr
+        self.totalQueries = 0
+        self.minStake = minimumStake
+    }
+
+    require fn onlyOwner() {
+        assert(msg.sender == self.owner, "Not owner")
+    }
+
+    pub fn getValidatorStake(validator: address) -> u256 {
+        self.totalQueries += 1
+
+        let stake = precompiled.getStake(validator)
+
+        emit StakeQueried {
+            validator: validator,
+            stake: stake,
+            timestamp: block.timestamp
+        }
+
+        return stake
+    }
+
+    pub fn isValidatorActive(validator: address) -> bool {
+        let stake = precompiled.getStake(validator)
+        let isActive = precompiled.isValidator(validator)
+
+        return isActive && stake >= self.minStake
+    }
+
+    view fn getQueryCount() -> u256 {
+        return self.totalQueries
+    }
+
+    pub fn setMinStake(newMinStake: u256) onlyOwner {
+        require(newMinStake > 0, "Minimum stake must be positive")
+        self.minStake = newMinStake
+    }
+
+    view fn getOwner() -> address {
+        return self.owner
+    }
+}

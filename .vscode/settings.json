@@ -1,0 +1,28 @@
+{
+    "files.associations": {
+        "*.kg": "kottg"
+    },
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": false,
+    "[kottg]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.wordWrap": "on"
+    },
+    "[go]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    "go.useLanguageServer": true,
+    "go.lintTool": "golangci-lint",
+    "go.lintOnSave": "package",
+    "files.exclude": {
+        "**/*.bin": true
+    },
+    "search.exclude": {
+        "**/*.bin": true
+    }
+}

@@ -1,0 +1,228 @@
+{
+    "Contract": {
+        "prefix": "contract",
+        "body": [
+            "contract ${1:ContractName} {",
+            "\tstate:",
+            "\t\t${2:variableName}: ${3:u256}",
+            "",
+            "\tinit(${4:params}) {",
+            "\t\t$0",
+            "\t}",
+            "}"
+        ],
+        "description": "Create a new contract"
+    },
+    "State Variable": {
+        "prefix": "state",
+        "body": [
+            "state:",
+            "\t${1:variableName}: ${2:u256}"
+        ],
+        "description": "Add state variables"
+    },
+    "Public Function": {
+        "prefix": "pubfn",
+        "body": [
+            "pub fn ${1:functionName}(${2:params}) -> ${3:u256} {",
+            "\t$0",
+            "}"
+        ],
+        "description": "Create a public function"
+    },
+    "View Function": {
+        "prefix": "viewfn",
+        "body": [
+            "view fn ${1:functionName}(${2:params}) -> ${3:u256} {",
+            "\treturn ${0:value}",
+            "}"
+        ],
+        "description": "Create a view function"
+    },
+    "Require Modifier": {
+        "prefix": "require",
+        "body": [
+            "require fn ${1:modifierName}() {",
+            "\tassert(${2:condition}, \"${3:error message}\")",
+            "}"
+        ],
+        "description": "Create a require modifier"
+    },
+    "Event": {
+        "prefix": "event",
+        "body": [
+            "event ${1:EventName} {",
+            "\t${2:field}: ${3:u256} indexed,",
+            "\t${4:field2}: ${5:address}",
+            "}"
+        ],
+        "description": "Create an event"
+    },
+    "Emit Event": {
+        "prefix": "emit",
+        "body": [
+            "emit ${1:EventName} {",
+            "\t${2:field}: ${3:value}",
+            "}"
+        ],
+        "description": "Emit an event"
+    },
+    "Init Function": {
+        "prefix": "init",
+        "body": [
+            "init(${1:params}) {",
+            "\t$0",
+            "}"
+        ],
+        "description": "Create constructor"
+    },
+    "Let Statement": {
+        "prefix": "let",
+        "body": [
+            "let ${1:variableName}: ${2:u256} = ${0:value}"
+        ],
+        "description": "Variable declaration"
+    },
+    "Mutable Let": {
+        "prefix": "letmut",
+        "body": [
+            "let mut ${1:variableName}: ${2:u256} = ${0:value}"
+        ],
+        "description": "Mutable variable declaration"
+    },
+    "If Statement": {
+        "prefix": "if",
+        "body": [
+            "if ${1:condition} {",
+            "\t$0",
+            "}"
+        ],
+        "description": "If statement"
+    },
+    "If-Else Statement": {
+        "prefix": "ifelse",
+        "body": [
+            "if ${1:condition} {",
+            "\t$2",
+            "} else {",
+            "\t$0",
+            "}"
+        ],
+        "description": "If-else statement"
+    },
+    "Loop Statement": {
+        "prefix": "loop",
+        "body": [
+            "loop ${1:i} in ${2:0}..${3:10} {",
+            "\t$0",
+            "}"
+        ],
+        "description": "Loop statement"
+    },
+    "While Loop": {
+        "prefix": "while",
+        "body": [
+            "while ${1:condition} {",
+            "\t$0",
+            "}"
+        ],
+        "description": "While loop"
+    },
+    "Match Statement": {
+        "prefix": "match",
+        "body": [
+            "match ${1:value} {",
+            "\t${2:0} => { $3 },",
+            "\t_ => { $0 }",
+            "}"
+        ],
+        "description": "Match statement"
+    },
+    "Assert": {
+        "prefix": "assert",
+        "body": [
+            "assert(${1:condition}, \"${2:error message}\")"
+        ],
+        "description": "Assert statement"
+    },
+    "Require": {
+        "prefix": "req",
+        "body": [
+            "require(${1:condition}, \"${2:error message}\")"
+        ],
+        "description": "Require statement"
+    },
+    "Revert": {
+        "prefix": "revert",
+        "body": [
+            "revert(\"${1:error message}\")"
+        ],
+        "description": "Revert statement"
+    },
+    "Struct": {
+        "prefix": "struct",
+        "body": [
+            "struct ${1:StructName} {",
+            "\t${2:field}: ${3:u256},",
+            "\t${4:field2}: ${5:address}",
+            "}"
+        ],
+        "description": "Create a struct"
+    },
+    "OnlyOwner Modifier": {
+        "prefix": "onlyowner",
+        "body": [
+            "require fn onlyOwner() {",
+            "\tassert(msg.sender == self.owner, \"Not owner\")",
+            "}"
+        ],
+        "description": "Only owner modifier"
+    },
+    "Precompiled GetStake": {
+        "prefix": "getstake",
+        "body": [
+            "let ${1:stake} = precompiled.getStake(${2:validator})"
+        ],
+        "description": "Get validator stake"
+    },
+    "Precompiled IsValidator": {
+        "prefix": "isvalidator",
+        "body": [
+            "let ${1:isValidator} = precompiled.isValidator(${2:address})"
+        ],
+        "description": "Check if address is validator"
+    },
+    "Full Contract Template": {
+        "prefix": "contractfull",
+        "body": [
+            "contract ${1:MyContract} {",
+            "\tstate:",
+            "\t\towner: address",
+            "\t\t${2:balance}: u256",
+            "",
+            "\tevent ${3:EventName} {",
+            "\t\tvalue: u256",
+            "\t\tsender: address indexed",
+            "\t}",
+            "",
+            "\tinit(ownerAddr: address) {",
+            "\t\tself.owner = ownerAddr",
+            "\t\tself.${2:balance} = 0",
+            "\t}",
+            "",
+            "\trequire fn onlyOwner() {",
+            "\t\tassert(msg.sender == self.owner, \"Not owner\")",
+            "\t}",
+            "",
+            "\tpub fn ${4:functionName}(${5:params}) onlyOwner {",
+            "\t\t$0",
+            "\t}",
+            "",
+            "\tview fn get${2/(.*)/${1:/capitalize}/}() -> u256 {",
+            "\t\treturn self.${2:balance}",
+            "\t}",
+            "}"
+        ],
+        "description": "Full contract template with common patterns"
+    }
+}

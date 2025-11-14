@@ -1,0 +1,119 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Kottg Compiler",
+            "type": "shell",
+            "command": "go",
+            "args": [
+                "build",
+                "-o",
+                "kottg.exe",
+                "main.go"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Compile Current Contract",
+            "type": "shell",
+            "command": "${workspaceFolder}/kottg.exe",
+            "args": [
+                "-input",
+                "${file}",
+                "-verbose"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": true
+            },
+            "problemMatcher": {
+                "owner": "kottg",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^Line (\\d+):(\\d+) - (.*)$",
+                    "file": 1,
+                    "line": 1,
+                    "column": 2,
+                    "message": 3
+                }
+            }
+        },
+        {
+            "label": "Compile Contract with AST",
+            "type": "shell",
+            "command": "${workspaceFolder}/kottg.exe",
+            "args": [
+                "-input",
+                "${file}",
+                "-verbose",
+                "-ast"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Compile Contract with Disassembly",
+            "type": "shell",
+            "command": "${workspaceFolder}/kottg.exe",
+            "args": [
+                "-input",
+                "${file}",
+                "-verbose",
+                "-disasm"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Compile Contract (All Options)",
+            "type": "shell",
+            "command": "${workspaceFolder}/kottg.exe",
+            "args": [
+                "-input",
+                "${file}",
+                "-verbose",
+                "-ast",
+                "-disasm",
+                "-json"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Compile All Example Contracts",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "for f in contracts/*.kg; do ./kottg.exe -input \"$f\" -verbose; done"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}

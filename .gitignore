@@ -1,0 +1,90 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+*.prof
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Compiled bytecode files
+*.bin
+*.bytecode
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+*~
+*.code-workspace
+
+# VSCode user-specific settings (keep workspace config)
+.vscode/settings.json.user
+.vscode/*.log
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Build output
+kottg
+kottg_unix
+kottg_darwin
+kottg.exe
+build/
+dist/
+out/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.cache
+tmp/
+temp/
+
+# VSCode extension packaging (if we package the extension)
+vscode-kottg/*.vsix
+vscode-kottg/node_modules/
+vscode-kottg/package-lock.json
+vscode-kottg/.vscode-test/
+vscode-kottg/out/
+
+# Contract compilation artifacts in test directories
+test/*.bin
+examples/*.bin
+contracts/*.bin
+
+# Debug files
+debug.log
+crash.log
+*.stackdump
+
+# Coverage reports
+coverage.txt
+coverage.html
+*.cover

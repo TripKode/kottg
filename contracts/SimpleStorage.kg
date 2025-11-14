@@ -1,0 +1,45 @@
+contract SimpleStorage {
+    state:
+        storedData: u256
+        owner: address
+
+    event DataStored {
+        value: u256,
+        setter: address indexed
+    }
+
+    init(initialValue: u256) {
+        self.storedData = initialValue
+        self.owner = msg.sender
+    }
+
+    require fn onlyOwner() {
+        assert(msg.sender == self.owner, "Only owner can call this function")
+    }
+
+    pub fn set(x: u256) onlyOwner {
+        self.storedData = x
+
+        emit DataStored {
+            value: x,
+            setter: msg.sender
+        }
+    }
+
+    view fn get() -> u256 {
+        return self.storedData
+    }
+
+    view fn getOwner() -> address {
+        return self.owner
+    }
+
+    pub fn increment() onlyOwner {
+        self.storedData += 1
+    }
+
+    pub fn decrement() onlyOwner {
+        require(self.storedData > 0, "Cannot decrement below zero")
+        self.storedData -= 1
+    }
+}
