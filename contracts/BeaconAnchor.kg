@@ -1,0 +1,58 @@
+// KSP-2 Gate 4: BeaconAnchor — ancla raíces de bloques beacon (BCR) en la
+// cadena de contratos. Ejercita los tres precompiles BCR:
+//   precompiled.beaconRoot()    → raíz QSH del último bloque beacon (0xc4)
+//   precompiled.beaconRoot(i)   → raíz del bloque en el índice i (0xc5)
+//   precompiled.beaconHeight()  → índice del último bloque beacon (0xc6)
+// La cadena consultada es la del contexto de ejecución (DPOS aquí).
+contract BeaconAnchor {
+    state:
+        owner: address
+        lastRoot: u256            // último anclaje
+        lastHeight: u256          // altura beacon del último anclaje
+        anchors: map[u256, u256]  // altura beacon → raíz anclada (histórico)
+
+    init(ownerAddr: address) {
+        self.owner = ownerAddr
+    }
+
+    require fn onlyOwner() {
+        assert(msg.sender == self.owner, "Not owner")
+    }
+
+    // --- lecturas directas del precompile BCR ---
+    view fn latestRoot() -> u256 {
+        return precompiled.beaconRoot()
+    }
+
+    view fn rootAt(i: u256) -> u256 {
+        return precompiled.beaconRoot(i)
+    }
+
+    view fn height() -> u256 {
+        return precompiled.beaconHeight()
+    }
+
+    // --- anclaje: compromete el estado del contrato con la raíz beacon ---
+    pub fn anchor() -> u256 onlyOwner {
+        let h = precompiled.beaconHeight()
+        let r = precompiled.beaconRoot()
+        self.anchors[h] = r
+        self.lastRoot = r
+        self.lastHeight = h
+        return r
+    }
+
+    // --- verificación: la raíz anclada a altura h coincide con la viva ---
+    view fn verifyAnchored(h: u256) -> u256 {
+        let stored = self.anchors[h]
+        let live = precompiled.beaconRoot(h)
+        if stored == live {
+            return 1
+        }
+        return 0
+    }
+
+    view fn getLastHeight() -> u256 {
+        return self.lastHeight
+    }
+}

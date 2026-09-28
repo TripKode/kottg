@@ -1109,7 +1109,12 @@ func (p *Parser) parseIndexExpression(left Expression) Expression {
 
 // parseMemberExpression parses member access
 func (p *Parser) parseMemberExpression(object Expression) Expression {
-	if !p.expectPeek(TOKEN_IDENT) {
+	// KSP-3: `address` es keyword (TOKEN_ADDRESS) — `self.address` debe
+	// parsear como miembro. Aceptamos IDENT o la keyword address.
+	if p.peekTokenIs(TOKEN_IDENT) || p.peekTokenIs(TOKEN_ADDRESS) {
+		p.nextToken()
+	} else {
+		p.addError(fmt.Sprintf("expected member name after '.', got %s", p.peekToken.Type))
 		return nil
 	}
 

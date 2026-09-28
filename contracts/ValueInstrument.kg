@@ -1,0 +1,85 @@
+// KSP-1: KVI — Kodechain Value Instrument
+// Implementación de referencia en kottg. Interfaz CONGELADA (KSEL-8 publicados
+// en docs/Operations/KSP-1-KVI.md — no cambiar firmas).
+//
+// Identidad KVI: toda dirección es el hash post-cuántico COMPLETO de la
+// dirección de la wallet (lo que el opcode CALLER empuja). El calldata lleva
+// identidades KVI de 32 bytes; msg.sender ya es una identidad KVI.
+//
+// Fallo = revert (trap KSM/KVM): las mutaciones reverten atómicamente.
+// Éxito = retorno u256 con valor 1 (KVI_OK). No existe bool en el dispatch.
+//
+// KVI-M: extensión de acuñación restringida al minter (faucet en testnet).
+contract ValueInstrument {
+    // Eventos: topic = QSH(firma canónica "Nombre(tipos)") vía LOG
+    event Transfer { from: address, to: address, value: u256 }
+    event Approval { owner: address, spender: address, value: u256 }
+    event Mint { to: address, value: u256 }
+
+    state:
+        owner: address                              // minter KVI-M
+        initialized: u256                           // guarda de re-init
+        supply: u256                                // total acuñado
+        balances: map[address, u256]                // identidad -> saldo
+        allowances: map[address, map[address, u256]] // dueño -> gastador -> cuota
+
+    init(minter: address) {
+        assert(self.initialized == 0, "KVI: already initialized")
+        self.owner = minter
+        self.initialized = 1
+        self.supply = 0
+    }
+
+    require fn onlyMinter() {
+        assert(msg.sender == self.owner, "KVI: not minter")
+    }
+
+    // ===== KVI-M: acuñación (faucet) =====
+    pub fn mint(to: address, amount: u256) -> u256 onlyMinter {
+        require(to != 0, "KVI: mint to zero identity")
+        self.balances[to] += amount
+        self.supply += amount
+        emit Mint { to: to, value: amount }
+        return 1
+    }
+
+    // ===== Interfaz congelada KSP-1 =====
+    pub fn transfer(to: address, amount: u256) -> u256 {
+        require(to != 0, "KVI: transfer to zero identity")
+        require(self.balances[msg.sender] >= amount, "KVI: insufficient balance")
+        self.balances[msg.sender] -= amount
+        self.balances[to] += amount
+        emit Transfer { from: msg.sender, to: to, value: amount }
+        return 1
+    }
+
+    pub fn approve(spender: address, amount: u256) -> u256 {
+        require(spender != 0, "KVI: approve zero identity")
+        self.allowances[msg.sender][spender] = amount
+        emit Approval { owner: msg.sender, spender: spender, value: amount }
+        return 1
+    }
+
+    pub fn transferFrom(from: address, to: address, amount: u256) -> u256 {
+        require(to != 0, "KVI: transfer to zero identity")
+        require(self.allowances[from][msg.sender] >= amount, "KVI: allowance exceeded")
+        require(self.balances[from] >= amount, "KVI: insufficient balance")
+        self.allowances[from][msg.sender] -= amount
+        self.balances[from] -= amount
+        self.balances[to] += amount
+        emit Transfer { from: from, to: to, value: amount }
+        return 1
+    }
+
+    view fn totalSupply() -> u256 {
+        return self.supply
+    }
+
+    view fn balanceOf(who: address) -> u256 {
+        return self.balances[who]
+    }
+
+    view fn allowance(owner: address, spender: address) -> u256 {
+        return self.allowances[owner][spender]
+    }
+}

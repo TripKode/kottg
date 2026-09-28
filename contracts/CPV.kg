@@ -1,0 +1,187 @@
+// KSP-3 Gate 5: CPV — Constant Product Vault (AMM de KodeChain).
+// Pool de producto constante x·y=k con fee 3/1000, liquidez proporcional y
+// KLP (posición de liquidez) materializado como KVI KSP-1 creado por la
+// factory. Toda la matemática es KSM (overflow = trap = revert atómico).
+//
+// Flujo de tokens (identidades KVI = QSH de la dirección):
+// - pulls:  ext.call(token, "transferFrom(address,address,u256)", msg.sender, self.address, amt)
+//           → requiere que el usuario haya hecho token.approve(ident(pool), amt)
+// - pushes: ext.call(token, "transfer(address,u256)", msg.sender, amt)
+//           → msg.sender dentro del KVI es ident(pool): el pool envía los
+//             tokens que custodia
+// - KLP:    mint por el pool (minter = ident(pool)); retiro por custodia
+//           (transferFrom hacia el pool — burn-by-custody)
+contract CPV {
+    event LiquidityAdded { provider: address, amountA: u256, amountB: u256, lp: u256 }
+    event Swapped { swapper: address, amountIn: u256, amountOut: u256 }
+
+    state:
+        initialized: u256
+        tokenA: address        // dirección CRUDA del KVI A (destino de ext.call)
+        tokenB: address
+        klp: address           // KVI del token de posición (minter = pool)
+        reserveA: u256
+        reserveB: u256
+        lpTotal: u256          // KLP en circulación (totalSupply del KLP)
+        feeNum: u256           // 3
+        feeDen: u256           // 1000
+
+    init(tokenAAddr: address, tokenBAddr: address, klpAddr: address) {
+        assert(self.initialized == 0, "CPV: ya inicializado")
+        self.tokenA = tokenAAddr
+        self.tokenB = tokenBAddr
+        self.klp = klpAddr
+        self.reserveA = 0
+        self.reserveB = 0
+        self.lpTotal = 0
+        self.feeNum = 3
+        self.feeDen = 1000
+        self.initialized = 1
+        // El POOL se registra como minter del KLP: self.address (opcode
+        // ADDRESS) es exactamente la identidad KVI que CALLER empuja en el
+        // KLP cuando el pool lo llama. init del KVI es void: el 0 del
+        // retorno se ignora — un fallo ya habría revertido en ext.call.
+        let okKlp = ext.call(klpAddr, "init(address)", self.address)
+    }
+
+    // ===== vistas =====
+    view fn aReserve() -> u256 { return self.reserveA }
+    view fn bReserve() -> u256 { return self.reserveB }
+    view fn getLpTotal() -> u256 { return self.lpTotal }
+    view fn getKlp() -> address { return self.klp }
+    view fn aToken() -> address { return self.tokenA }
+    view fn bToken() -> address { return self.tokenB }
+
+    // cotización A→B sin ejecutar (para slippage off-chain)
+    view fn quoteAForB(amountIn: u256) -> u256 {
+        assert(self.reserveA > 0, "CPV: sin liquidez A")
+        assert(self.reserveB > 0, "CPV: sin liquidez B")
+        let inFee = amountIn * (self.feeDen - self.feeNum)
+        let out = self.reserveB * inFee / (self.reserveA * self.feeDen + inFee)
+        return out
+    }
+
+    // cotización B→A sin ejecutar
+    view fn quoteBForA(amountIn: u256) -> u256 {
+        assert(self.reserveA > 0, "CPV: sin liquidez A")
+        assert(self.reserveB > 0, "CPV: sin liquidez B")
+        let inFee = amountIn * (self.feeDen - self.feeNum)
+        let out = self.reserveA * inFee / (self.reserveB * self.feeDen + inFee)
+        return out
+    }
+
+    // ===== liquidez =====
+    pub fn addLiquidity(amountA: u256, amountB: u256) -> u256 {
+        assert(amountA > 0, "CPV: cantidad A cero")
+        assert(amountB > 0, "CPV: cantidad B cero")
+        let pool = self.address
+
+        // KLP a mintear: primera liquidez = A*B/1000 (sin sqrt en KVM —
+        // KSP-3 define divisor fijo); posteriores = proporcional mínima.
+        let mut liq: u256 = 0
+        if self.lpTotal == 0 {
+            liq = amountA * amountB / 1000
+        }
+        if self.lpTotal > 0 {
+            let la = amountA * self.lpTotal / self.reserveA
+            let lb = amountB * self.lpTotal / self.reserveB
+            liq = la
+            if lb < la {
+                liq = lb
+            }
+        }
+        assert(liq > 0, "CPV: liquidez minteable cero")
+
+        // pull de ambos tokens (msg.sender aprobó al pool en cada KVI)
+        let okA = ext.call(self.tokenA, "transferFrom(address,address,u256)", msg.sender, pool, amountA)
+        assert(okA == 1, "CPV: pull A fallo")
+        let okB = ext.call(self.tokenB, "transferFrom(address,address,u256)", msg.sender, pool, amountB)
+        assert(okB == 1, "CPV: pull B fallo")
+
+        // mint KLP al proveedor (el pool es el minter del KLP)
+        let okMint = ext.call(self.klp, "mint(address,u256)", msg.sender, liq)
+        assert(okMint == 1, "CPV: mint KLP fallo")
+
+        self.reserveA += amountA
+        self.reserveB += amountB
+        self.lpTotal += liq
+
+        emit LiquidityAdded { provider: msg.sender, amountA: amountA, amountB: amountB, lp: liq }
+        return liq
+    }
+
+    pub fn removeLiquidity(lpAmount: u256) -> u256 {
+        assert(lpAmount > 0, "CPV: cantidad cero")
+        assert(lpAmount <= self.lpTotal, "CPV: KLP insuficiente")
+        let pool = self.address
+
+        // proporciones exactas del pool
+        let amountA = lpAmount * self.reserveA / self.lpTotal
+        let amountB = lpAmount * self.reserveB / self.lpTotal
+        assert(amountA > 0, "CPV: retiro A cero")
+        assert(amountB > 0, "CPV: retiro B cero")
+
+        // burn-by-custody: retirar el KLP del proveedor hacia el pool
+        // (msg.sender aprobó al pool en el KLP)
+        let okPull = ext.call(self.klp, "transferFrom(address,address,u256)", msg.sender, pool, lpAmount)
+        assert(okPull == 1, "CPV: pull KLP fallo")
+
+        // devolver los tokens custodiados
+        let okA = ext.call(self.tokenA, "transfer(address,u256)", msg.sender, amountA)
+        assert(okA == 1, "CPV: envio A fallo")
+        let okB = ext.call(self.tokenB, "transfer(address,u256)", msg.sender, amountB)
+        assert(okB == 1, "CPV: envio B fallo")
+
+        self.reserveA -= amountA
+        self.reserveB -= amountB
+        self.lpTotal -= lpAmount
+        return amountA
+    }
+
+    // ===== swaps =====
+    pub fn swapAForB(amountIn: u256, minOut: u256) -> u256 {
+        assert(amountIn > 0, "CPV: cantidad cero")
+        assert(self.reserveA > 0, "CPV: sin liquidez A")
+        assert(self.reserveB > 0, "CPV: sin liquidez B")
+        let pool = self.address
+
+        let inFee = amountIn * (self.feeDen - self.feeNum)
+        let out = self.reserveB * inFee / (self.reserveA * self.feeDen + inFee)
+        assert(out > 0, "CPV: salida cero")
+        assert(out >= minOut, "CPV: slippage excedido")
+
+        let okIn = ext.call(self.tokenA, "transferFrom(address,address,u256)", msg.sender, pool, amountIn)
+        assert(okIn == 1, "CPV: pull A fallo")
+        let okOut = ext.call(self.tokenB, "transfer(address,u256)", msg.sender, out)
+        assert(okOut == 1, "CPV: envio B fallo")
+
+        self.reserveA += amountIn
+        self.reserveB -= out
+
+        emit Swapped { swapper: msg.sender, amountIn: amountIn, amountOut: out }
+        return out
+    }
+
+    pub fn swapBForA(amountIn: u256, minOut: u256) -> u256 {
+        assert(amountIn > 0, "CPV: cantidad cero")
+        assert(self.reserveA > 0, "CPV: sin liquidez A")
+        assert(self.reserveB > 0, "CPV: sin liquidez B")
+        let pool = self.address
+
+        let inFee = amountIn * (self.feeDen - self.feeNum)
+        let out = self.reserveA * inFee / (self.reserveB * self.feeDen + inFee)
+        assert(out > 0, "CPV: salida cero")
+        assert(out >= minOut, "CPV: slippage excedido")
+
+        let okIn = ext.call(self.tokenB, "transferFrom(address,address,u256)", msg.sender, pool, amountIn)
+        assert(okIn == 1, "CPV: pull B fallo")
+        let okOut = ext.call(self.tokenA, "transfer(address,u256)", msg.sender, out)
+        assert(okOut == 1, "CPV: envio A fallo")
+
+        self.reserveB += amountIn
+        self.reserveA -= out
+
+        emit Swapped { swapper: msg.sender, amountIn: amountIn, amountOut: out }
+        return out
+    }
+}

@@ -1,0 +1,67 @@
+// KSP-F2 Gate 2: registry con mappings, vec, sec.qsh, u64 y direcciones
+// derivadas (wallet-scheme). Cada función prueba una característica.
+contract Registry {
+    state:
+        owner: address
+        supply: u256
+        ledger: map[address, u256]          // KSP-F2: mapping real
+        scores: vec[u256]                   // KSP-F2: array base+idx
+        counter: u64                        // KSP-F2: range-check 64 bits
+
+    init(ownerAddr: address) {
+        self.owner = ownerAddr
+        self.supply = 0
+        self.counter = 0
+    }
+
+    require fn onlyOwner() {
+        assert(msg.sender == self.owner, "Not owner")
+    }
+
+    // --- mapping: deposit(who, amount) suma al ledger y al supply ---
+    pub fn deposit(who: address, amount: u256) onlyOwner {
+        self.ledger[who] += amount
+        self.supply += amount
+    }
+
+    // --- mapping read ---
+    view fn balanceOf(who: address) -> u256 {
+        return self.ledger[who]
+    }
+
+    // --- mapping: transfer entre keys ---
+    pub fn transferFrom(from: address, to: address, amount: u256) onlyOwner {
+        require(self.ledger[from] >= amount, "insufficient")
+        self.ledger[from] -= amount
+        self.ledger[to] += amount
+    }
+
+    // --- vec: setScore(i, v) / getScore(i) ---
+    pub fn setScore(i: u256, v: u256) onlyOwner {
+        self.scores[i] = v
+    }
+
+    view fn getScore(i: u256) -> u256 {
+        return self.scores[i]
+    }
+
+    // --- sec.qsh: commitment runtime ---
+    pub fn commit(v: u256) -> u256 {
+        let h = sec.qsh(v)
+        return h
+    }
+
+    // --- u64: bump() con range-check ---
+    pub fn bump() onlyOwner {
+        self.counter += 1
+    }
+
+    view fn getCounter() -> u64 {
+        return self.counter
+    }
+
+    // --- u64: forzar overflow del range-check (2^64 - 1 + 1 → trap) ---
+    pub fn setCounterBig(v: u64) onlyOwner {
+        self.counter = v
+    }
+}

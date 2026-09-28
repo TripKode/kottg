@@ -156,7 +156,21 @@ func (sa *SemanticAnalyzer) typesMatch(t1, t2 TypeNode) bool {
 	if t1 == nil || t2 == nil {
 		return false
 	}
-	return t1.TypeName() == t2.TypeName()
+	n1, n2 := t1.TypeName(), t2.TypeName()
+	if n1 == n2 {
+		return true
+	}
+	// KSP-F2: familia numérica compatible — la seguridad la garantiza el
+	// RANGE-CHECK en runtime (emitRangeCheck), no el checker estático.
+	if isNumericType(n1) && isNumericType(n2) {
+		return true
+	}
+	// KSP-1: identidad address = u256 en runtime (hash QSH completo), por lo
+	// que address ↔ numérico es comparable/asignable estáticamente.
+	if (n1 == "address" && isNumericType(n2)) || (n2 == "address" && isNumericType(n1)) {
+		return true
+	}
+	return false
 }
 
 // getExpressionType returns the type of an expression
@@ -209,6 +223,12 @@ func (sa *SemanticAnalyzer) getIdentifierType(ident *Identifier) TypeNode {
 		return &PrimitiveType{Name: "contract"}
 	case "precompiled":
 		return &PrimitiveType{Name: "precompiled"}
+	case "sec":
+		// KSP-F2: builtin cripto post-cuántico (sec.qsh)
+		return &PrimitiveType{Name: "sec"}
+	case "ext":
+		// KSP-3: builtin de llamadas externas (ext.call / ext.create)
+		return &PrimitiveType{Name: "ext"}
 	}
 
 	// Lookup in scope
@@ -345,6 +365,47 @@ func (sa *SemanticAnalyzer) getMemberCallType(memberExpr *MemberExpr, args []Exp
 		return sa.getPrecompiledCallType(memberExpr.Member, args)
 	}
 
+	// KSP-F2: sec.qsh(value) → u256 (hash post-cuántico runtime)
+	if objectType.TypeName() == "sec" {
+		if memberExpr.Member == "qsh" {
+			if len(args) != 1 {
+				sa.addError("sec.qsh requiere 1 argumento")
+				return nil
+			}
+			return &PrimitiveType{Name: "u256"}
+		}
+		sa.addError("sec." + memberExpr.Member + " no existe (solo qsh)")
+		return nil
+	}
+
+	// KSP-3: ext.call(to, "sig", args...) → u256; ext.create(code) → address
+	if objectType.TypeName() == "ext" {
+		switch memberExpr.Member {
+		case "call":
+			if len(args) < 2 {
+				sa.addError("ext.call requiere: dirección, firma literal, args...")
+				return nil
+			}
+			if lit, ok := args[1].(*StringLiteral); !ok || !strings.Contains(lit.Value, "(") {
+				sa.addError("ext.call: la firma debe ser un literal \"nombre(tipos)\"")
+				return nil
+			}
+			return &PrimitiveType{Name: "u256"}
+		case "create":
+			if len(args) != 1 {
+				sa.addError("ext.create requiere 1 literal string con bytecode hex")
+				return nil
+			}
+			if _, ok := args[0].(*StringLiteral); !ok {
+				sa.addError("ext.create: el bytecode debe ser un literal string")
+				return nil
+			}
+			return &PrimitiveType{Name: "address"}
+		}
+		sa.addError("ext." + memberExpr.Member + " no existe (solo call/create)")
+		return nil
+	}
+
 	// Handle msg, block, tx context members
 	if objectType.TypeName() == "msg_context" {
 		return sa.getMsgMemberType(memberExpr.Member)
@@ -370,6 +431,22 @@ func (sa *SemanticAnalyzer) getPrecompiledCallType(method string, args []Express
 	case "getStake":
 		if len(args) != 1 {
 			sa.addError(fmt.Sprintf("precompiled.getStake expects 1 argument, got %d", len(args)))
+			return nil
+		}
+		return &PrimitiveType{Name: "u256"}
+
+	case "beaconRoot":
+		// KSP-2: precompiled.beaconRoot() → último; beaconRoot(i) → raíz en i
+		if len(args) > 1 {
+			sa.addError(fmt.Sprintf("precompiled.beaconRoot expects 0 or 1 arguments, got %d", len(args)))
+			return nil
+		}
+		return &PrimitiveType{Name: "u256"}
+
+	case "beaconHeight":
+		// KSP-2: precompiled.beaconHeight() → índice del último bloque beacon
+		if len(args) != 0 {
+			sa.addError(fmt.Sprintf("precompiled.beaconHeight expects 0 arguments, got %d", len(args)))
 			return nil
 		}
 		return &PrimitiveType{Name: "u256"}

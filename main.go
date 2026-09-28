@@ -20,8 +20,8 @@ func main() {
 	outputFile := flag.String("output", "", "Output bytecode file (default: <input>.bin)")
 	disassemble := flag.Bool("disasm", false, "Show disassembled bytecode")
 	showAST := flag.Bool("ast", false, "Show Abstract Syntax Tree")
-	verbose := flag.Bool("verbose", false, "Verbose output")
-	version := flag.Bool("version", false, "Show version")
+	verbose := flag.Bool("verbose", false, "Verbose output  ")
+	version := flag.Bool("version", false, "Show version    ")
 	jsonOutput := flag.Bool("json", false, "Output bytecode metadata as JSON")
 
 	flag.Parse()
@@ -100,7 +100,7 @@ func main() {
 	if *showAST {
 		fmt.Println("\n═══════════════════════════════════════════")
 		fmt.Println("ABSTRACT SYNTAX TREE")
-		fmt.Println("═══════════════════════════════════════════\n")
+		fmt.Println("═══════════════════════════════════════════")
 		printAST(program)
 	}
 
@@ -146,7 +146,7 @@ func main() {
 	if *disassemble {
 		fmt.Println("\n═══════════════════════════════════════════")
 		fmt.Println("DISASSEMBLY")
-		fmt.Println("═══════════════════════════════════════════\n")
+		fmt.Println("═══════════════════════════════════════════")
 		printDisassembly(bytecodeGen)
 	}
 
@@ -159,7 +159,7 @@ func main() {
 		}
 		fmt.Println("\n═══════════════════════════════════════════")
 		fmt.Println("BYTECODE METADATA (JSON)")
-		fmt.Println("═══════════════════════════════════════════\n")
+		fmt.Println("═══════════════════════════════════════════")
 		fmt.Println(jsonData)
 	}
 
@@ -265,14 +265,7 @@ func printAST(program *compiler.Program) {
 
 // printDisassembly prints the disassembled bytecode
 func printDisassembly(gen *compiler.BytecodeGenerator) {
-	disasm := gen.Disassemble()
-	for _, instr := range disasm {
-		if instr.Data != "" {
-			fmt.Printf("%04d: %-15s %s\n", instr.Offset, instr.Opcode, instr.Data)
-		} else {
-			fmt.Printf("%04d: %s\n", instr.Offset, instr.Opcode)
-		}
-	}
+	fmt.Print(gen.Disassemble())
 }
 
 // min returns the minimum of two integers
