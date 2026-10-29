@@ -1,0 +1,107 @@
+// Crowdfund — campaña de donación con tope y reembolso automático.
+// La unidad de donación es un KVI (custodia en ledger, patrón CPV):
+// - El donante aprueba al contrato y donate() hace pull por transferFrom.
+// - Meta alcanzada → payout() empuja TODO al beneficiario.
+// - Deadline pasado sin meta → cada donante recupera lo suyo con refund()
+//   (el primero congela la campaña: settled=2, sin más donaciones).
+// Tiempos en segundos unix (block.timestamp). Montos en unidades del KVI.
+// Fallo = revert atómico (trampas KSM): ninguna mutación parcial sobrevive.
+contract Crowdfund {
+    event Donated { donor: address, amount: u256 }
+    event PaidOut { beneficiary: address, amount: u256 }
+    event Refunded { donor: address, amount: u256 }
+
+    state:
+        owner: address
+        initialized: u256
+        token: address          // dirección CRUDA del KVI (destino de ext.call)
+        beneficiary: address    // identidad KVI del beneficiario
+        goal: u256
+        deadline: u256
+        raised: u256
+        settled: u256           // 0 abierta, 1 pagada, 2 fallida (reembolsos)
+        donations: map[address, u256]
+
+    init(tokenAddr: address, beneficiaryIdent: address, goalAmount: u256, deadlineTs: u256) {
+        assert(self.initialized == 0, "CF: already initialized")
+        require(tokenAddr != 0, "CF: zero token")
+        require(beneficiaryIdent != 0, "CF: zero beneficiary")
+        require(goalAmount > 0, "CF: zero goal")
+        require(deadlineTs > block.timestamp, "CF: deadline in the past")
+        self.owner = msg.sender
+        self.initialized = 1
+        self.token = tokenAddr
+        self.beneficiary = beneficiaryIdent
+        self.goal = goalAmount
+        self.deadline = deadlineTs
+        self.raised = 0
+        self.settled = 0
+    }
+
+    // Dona: requiere approve(ident(contrato), monto) previo en el KVI.
+    pub fn donate(amount: u256) -> u256 {
+        require(self.settled == 0, "CF: campaign closed")
+        require(block.timestamp < self.deadline, "CF: past deadline")
+        require(amount > 0, "CF: zero donation")
+        let ok = ext.call(self.token, "transferFrom(address,address,u256)", msg.sender, self.address, amount)
+        require(ok == 1, "CF: pull failed")
+        self.donations[msg.sender] += amount
+        self.raised += amount
+        emit Donated { donor: msg.sender, amount: amount }
+        return 1
+    }
+
+    // Éxito: empuja todo lo recaudado al beneficiario (una sola vez).
+    pub fn payout() -> u256 {
+        require(self.settled == 0, "CF: already settled")
+        require(self.raised >= self.goal, "CF: goal not met")
+        self.settled = 1
+        let ok = ext.call(self.token, "transfer(address,u256)", self.beneficiary, self.raised)
+        require(ok == 1, "CF: payout failed")
+        emit PaidOut { beneficiary: self.beneficiary, amount: self.raised }
+        return 1
+    }
+
+    // Fracaso: tras el deadline sin meta, cada donante recupera lo suyo.
+    // El primero congela la campaña para que nadie más done.
+    pub fn refund() -> u256 {
+        require(self.settled != 1, "CF: already paid out")
+        require(block.timestamp >= self.deadline, "CF: too early")
+        require(self.raised < self.goal, "CF: goal met, no refunds")
+        let amt = self.donations[msg.sender]
+        require(amt > 0, "CF: nothing to refund")
+        self.settled = 2
+        self.donations[msg.sender] = 0
+        let ok = ext.call(self.token, "transfer(address,u256)", msg.sender, amt)
+        require(ok == 1, "CF: refund failed")
+        emit Refunded { donor: msg.sender, amount: amt }
+        return 1
+    }
+
+    view fn getRaised() -> u256 {
+        return self.raised
+    }
+
+    view fn getGoal() -> u256 {
+        return self.goal
+    }
+
+    view fn getDeadline() -> u256 {
+        return self.deadline
+    }
+
+    view fn getSettled() -> u256 {
+        return self.settled
+    }
+
+    view fn myDonation() -> u256 {
+        return self.donations[msg.sender]
+    }
+
+    view fn timeLeft() -> u256 {
+        if block.timestamp >= self.deadline {
+            return 0
+        }
+        return self.deadline - block.timestamp
+    }
+}

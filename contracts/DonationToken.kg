@@ -1,0 +1,70 @@
+// DonationToken — KVI mínimo para la dapp de donaciones (Crowdfund).
+// Patrón KSP-1 probado (cfr. ValueInstrument): ledger por identidad,
+// custodia por transferFrom con approve previo, pushes por transfer.
+// Identidades = QSH completo de la dirección (lo que empuja CALLER).
+contract DonationToken {
+    event Transfer { from: address, to: address, value: u256 }
+    event Approval { owner: address, spender: address, value: u256 }
+    event Mint { to: address, value: u256 }
+
+    state:
+        owner: address
+        initialized: u256
+        supply: u256
+        balances: map[address, u256]
+        allowances: map[address, map[address, u256]]
+
+    init(minter: address) {
+        assert(self.initialized == 0, "DON: already initialized")
+        self.owner = minter
+        self.initialized = 1
+        self.supply = 0
+    }
+
+    require fn onlyMinter() {
+        assert(msg.sender == self.owner, "DON: not minter")
+    }
+
+    pub fn mint(to: address, amount: u256) -> u256 onlyMinter {
+        require(to != 0, "DON: mint to zero identity")
+        self.balances[to] += amount
+        self.supply += amount
+        emit Mint { to: to, value: amount }
+        return 1
+    }
+
+    pub fn transfer(to: address, amount: u256) -> u256 {
+        require(to != 0, "DON: transfer to zero identity")
+        require(self.balances[msg.sender] >= amount, "DON: insufficient balance")
+        self.balances[msg.sender] -= amount
+        self.balances[to] += amount
+        emit Transfer { from: msg.sender, to: to, value: amount }
+        return 1
+    }
+
+    pub fn approve(spender: address, amount: u256) -> u256 {
+        require(spender != 0, "DON: approve zero identity")
+        self.allowances[msg.sender][spender] = amount
+        emit Approval { owner: msg.sender, spender: spender, value: amount }
+        return 1
+    }
+
+    pub fn transferFrom(from: address, to: address, amount: u256) -> u256 {
+        require(to != 0, "DON: transfer to zero identity")
+        require(self.allowances[from][msg.sender] >= amount, "DON: allowance exceeded")
+        require(self.balances[from] >= amount, "DON: insufficient balance")
+        self.allowances[from][msg.sender] -= amount
+        self.balances[from] -= amount
+        self.balances[to] += amount
+        emit Transfer { from: from, to: to, value: amount }
+        return 1
+    }
+
+    view fn totalSupply() -> u256 {
+        return self.supply
+    }
+
+    view fn balanceOf(who: address) -> u256 {
+        return self.balances[who]
+    }
+}
